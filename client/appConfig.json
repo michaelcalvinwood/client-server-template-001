@@ -1,0 +1,7 @@
+{
+    "desktopBreakpoint": 1024,
+    "tabletBreakpoint": 600,
+    "host": "template.acur.ai",
+    "port": 443,
+    "proto": "https"
+}
