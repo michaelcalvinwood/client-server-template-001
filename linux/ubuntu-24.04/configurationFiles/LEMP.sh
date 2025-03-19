@@ -1,15 +1,25 @@
 #!/bin/bash
-# Exit on error
-set -e
 
-# Print commands before executing
-set -x
 
 # Make sure we are root
 if [ "$(id -u)" -ne 0 ]; then
     echo "This script must be run as root" >&2
     exit 1
 fi
+
+# Make sure we have control over packages
+sudo killall apt apt-get dpkg
+sudo rm /var/lib/dpkg/lock-frontend
+sudo rm /var/lib/apt/lists/lock
+sudo rm /var/cache/apt/archives/lock
+sudo rm /var/lib/dpkg/lock
+sudo dpkg --configure -a
+
+# Exit on error
+set -e
+
+# Print commands before executing
+set -x
 
 # Configure dpkg to keep existing config files
 export DEBIAN_FRONTEND=noninteractive
@@ -42,6 +52,7 @@ fi
 domain=$(grep "^domain=" server.conf | cut -d'=' -f2)
 email=$(grep "^email=" server.conf | cut -d'=' -f2)
 dbPassword=$(grep "^dbPassword=" server.conf | cut -d'=' -f2)
+serviceIp=$(grep "^serviceIp=" server.conf | cut -d'=' -f2)
 
 # Validate required values
 if [ -z "$domain" ]; then
@@ -58,6 +69,12 @@ if [ -z "$dbPassword" ]; then
     echo "Error: dbPassword not found in server.conf"
     exit 1
 fi
+
+if [ -z "$serviceIp" ]; then
+    echo "Error: serviceIp not found in server.conf"
+    exit 1
+fi
+
 
 # If we reach here, all required values were found
 echo "Successfully loaded configuration values"
@@ -193,7 +210,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '$dbPas
 FLUSH PRIVILEGES;
 EOF
 
-sed -i 's/bind-address\s*=\s*127.0.0.1/bind-address = 0.0.0.0/' /etc/mysql/mysql.conf.d/mysqld.cnf
+sed -i 's/bind-address\s*=\s*127.0.0.1/bind-address = '"$serviceIp/" /etc/mysql/mysql.conf.d/mysqld.cnf
 
 # Create root@% user that can connect from any host with the same password
 mysql --user=root --password="$dbPassword" <<EOF
@@ -205,8 +222,30 @@ EOF
 # Restart MySQL for changes to take effect
 systemctl restart mysql
 
-echo "MySQL has been installed and configured to listen on 0.0.0.0"
+echo "MySQL has been installed and configured to listen on $serviceIp"
 echo "Root password has been set and remote access enabled."
 
 echo "MySQL has been installed and root password has been set successfully."
 
+# Install HTTPS
+
+# Install certbot and nginx plugin
+apt-get install -y certbot python3-certbot-nginx
+
+# Use certbot's nginx plugin to automatically obtain certificate and update nginx config
+certbot --nginx --non-interactive --agree-tos --email admin@${domain} -d ${domain}
+
+# Set up auto-renewal for the certificate (this is usually done automatically by the certbot package)
+# But we'll ensure it's there
+if [ ! -f "/etc/cron.d/certbot" ]; then
+  echo "0 */12 * * * root certbot renew --quiet --deploy-hook 'systemctl reload nginx'" > /etc/cron.d/certbot
+fi
+
+echo "HTTPS has been configured for ${domain}"
+
+# Install network tools
+apt install -y net-tools
+
+# Enable the firewall
+ufw allow 22/tcp
+sudo ufw --force enable
