@@ -16,3 +16,35 @@ else
     echo "dbPassword=$password" >> server.conf
     echo "Added new dbPassword to server.conf"
 fi
+
+# Load configuration values from server.conf
+if [ ! -f server.conf ]; then
+    echo "Error: server.conf file not found"
+    exit 1
+fi
+
+# Read values using grep and cut
+domain=$(grep "^domain=" server.conf | cut -d'=' -f2)
+email=$(grep "^email=" server.conf | cut -d'=' -f2)
+dbPassword=$(grep "^dbPassword=" server.conf | cut -d'=' -f2)
+
+# Validate required values
+if [ -z "$domain" ]; then
+    echo "Error: domain not found in server.conf"
+    exit 1
+fi
+
+if [ -z "$email" ]; then
+    echo "Error: email not found in server.conf"
+    exit 1
+fi
+
+if [ -z "$dbPassword" ]; then
+    echo "Error: dbPassword not found in server.conf"
+    exit 1
+fi
+
+# If we reach here, all required values were found
+echo "Successfully loaded configuration values"
+
+
