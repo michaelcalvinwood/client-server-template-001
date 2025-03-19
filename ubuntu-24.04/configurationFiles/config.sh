@@ -47,4 +47,57 @@ fi
 # If we reach here, all required values were found
 echo "Successfully loaded configuration values"
 
+# Install and Configure nginx
+DEBIAN_FRONTEND=noninteractive sudo apt-get update
+DEBIAN_FRONTEND=noninteractive sudo apt-get upgrade -y
+DEBIAN_FRONTEND=noninteractive sudo apt-get install -y nginx libnginx-mod-http-headers-more-filter
+sudo ufw app list
+sudo ufw allow 'Nginx HTTP'
 
+sudo mkdir /var/www/$domain
+
+sudo chown -R $USER:$USER /var/www/$domain
+
+printf "server {
+    listen 80;
+    server_name $domain www.$domain;
+    root /var/www/$domain;
+
+    index index.php index.html index.htm;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_read_timeout 600;
+        fastcgi_send_timeout 600;
+        fastcgi_connect_timeout 600;
+     }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+}" > /etc/nginx/sites-available/$domain
+
+sudo ln -s /etc/nginx/sites-available/$domain /etc/nginx/sites-enabled/
+
+sudo unlink /etc/nginx/sites-enabled/default
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+printf "<html>
+  <head>
+    <title>your_domain website</title>
+  </head>
+  <body>
+    <h1>Hello World!</h1>
+
+    <p>This is the landing page of <strong>$domain</strong>.</p>
+  </body>
+</html>" > /var/www/$domain/index.html
