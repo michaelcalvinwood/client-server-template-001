@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { assign } from '../../store/slices/universalSlice';
+import GetFile from '../../components/GetFile';
 
 function DesktopApp() {
   const universal = useSelector(state => state.universal);
@@ -9,6 +10,10 @@ function DesktopApp() {
   console.log(universal);
 
   const dispatch = useDispatch();
+
+  const processFiles = async (file) => {
+    console.log(file);
+  }
 
   useEffect(() => {
     if (!universal.hello) {
@@ -21,7 +26,9 @@ function DesktopApp() {
   }, [])
 
   return (
-    <div>DesktopApp</div>
+    <div>
+      <GetFile handleSelectedFiles={processFiles} />
+    </div>
   )
 }
 
